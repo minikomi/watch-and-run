@@ -6,7 +6,7 @@
             [clojure.tools.namespace.track :as ns-track]
             [hawk.core :as hawk]
             [mount.core :as mount]
-            [simple-static.components.ns-tracker :refer [tracker]]
+            [co.poyo.ns-tracker :refer [tracker]]
             [taoensso.timbre :as timbre]))
 
 (defn get-dep-graph [src-paths]
