@@ -1,1 +1,77 @@
-(ns co.poyo.file-map)
+(ns co.poyo.file-map
+  (:require [me.raynes.fs :as fs]
+            [clojure.java.io :as io]
+            [clojure.edn :as edn]
+            [taoensso.timbre :as timbre]
+            [clojure.string :as str]))
+
+(defn spit-txt [base-path {:keys [template path data]}]
+  (let [out-file
+        (apply fs/file
+               base-path
+               path)]
+    (timbre/infof "BUILD [%s]->[%s]"
+                  template
+                  (str/join "/" path))
+    (io/make-parents out-file)
+    (spit
+     out-file
+     ((resolve template) data))))
+
+(defn sym->ns-sym [sym]
+  (when-let [resolved (resolve sym)]
+    (-> resolved
+        meta
+        :ns
+        ns-name
+        name
+        symbol)))
+
+(defn load-edn
+  "Load edn from an io/reader source (filename or io/resource)."
+  [source]
+  (try
+    (with-open [r (io/reader source)]
+      (edn/read (java.io.PushbackReader. r)))
+    (catch java.io.IOException e
+      (timbre/errorf "Couldn't open '%s': %s" source (.getMessage e)))
+    (catch RuntimeException e
+      (timbre/errorf "Error parsing edn file '%s': %s" source (.getMessage e)))))
+
+(defn parse-file-map
+  ([file-map-edn]
+   (parse-file-map file-map-edn {:base-path ""}))
+  ([file-map-edn {:keys [base-path]}]
+   (try
+     (let [acc (volatile! #{})]
+       (doall
+        (tree-seq
+         (fn file-map->jobs-br? [node] ;; branch
+           (if-let [f (or (:build-fn node) (:template node))]
+             (if-let [ns-sym (sym->ns-sym f)]
+               (do (vswap! acc conj
+                           {:base-path base-path
+                            :path (:path node)
+                            :template (:template node)
+                            :data (:data node)
+                            :ns-sym ns-sym
+                            :build-fn (or (:build-fn node)
+                                          (fn [] (spit-txt base-path node)))})
+                   false) ;; end tree walk here
+               (timbre/warnf "Could not find sym/ns [%s]" (:template node)))
+             (map? node)))
+         (fn file-map->jobs-children [node] ;; children
+           (for [[p n] node
+                 :when (and (map? n) (not (:template p)))]
+             (assoc n :path ((fnil conj []) (:path node) p))))
+         file-map-edn))
+       @acc)
+     (catch Exception e
+
+       (timbre/errorf "Error loading file map %s [%s]" (.getMessage e) file-map-edn)))))
+
+(defn load-file-map
+  ([file-map-source]
+   (load-file-map file-map-source {:base-path "target"}))
+  ([file-map-source opts]
+   (parse-file-map (load-edn file-map-source) opts)))
