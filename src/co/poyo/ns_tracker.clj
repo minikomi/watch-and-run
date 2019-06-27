@@ -4,4 +4,4 @@
 
 (mount/defstate tracker
   :start
-  (ns-trJacker/ns-tracker ["src"]))
+  (ns-tracker/ns-tracker ["src"]))
