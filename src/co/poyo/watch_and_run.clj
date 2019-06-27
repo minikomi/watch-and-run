@@ -24,22 +24,25 @@
         all-dependencies (:dependencies (get-dep-graph tracked-src))
         ns-names (set (ns-find/find-namespaces (map io/file tracked-src)))
         part-of-project? (partial contains? ns-names)]
-    (set (tree-seq identity
+     (tree-seq identity
                    #(filter
                      part-of-project?
                      (get all-dependencies %))
-                   ns-sym))))
+                   ns-sym)))
 
 (defn watch-handler [watched]
   (let [changed (set (tracker))
         reloaded (volatile! #{})]
     (doseq [{:keys [build-fn ns-sym]} @watched
             :let [deps (all-local-deps-deep ns-sym)
-                  intersection (set/intersection deps changed)]
+                  intersection (set/intersection (set deps) changed)]
             :when (not-empty intersection)]
+      (println "DEPS" deps)
       ;; reload changed namespaces
-      (doseq [reload-ns-sym intersection
-              :when (not (contains? @reloaded reload-ns-sym))]
+      (doseq [reload-ns-sym (reverse deps)
+              :when (and
+                     (contains? changed reload-ns-sym)
+                     (not (contains? @reloaded reload-ns-sym)))]
         (timbre/info "Reloading:" reload-ns-sym)
         (require reload-ns-sym :reload)
         (vswap! reloaded conj reload-ns-sym))
