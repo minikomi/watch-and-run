@@ -37,8 +37,6 @@
             :let [deps (all-local-deps-deep ns-sym)
                   intersection (set/intersection (set deps) changed)]
             :when (not-empty intersection)]
-      (println "DEPS" deps)
-      ;; reload changed namespaces
       (doseq [reload-ns-sym (reverse deps)
               :when (and
                      (contains? changed reload-ns-sym)
