@@ -1,4 +1,4 @@
-(ns co.poyo.file-map
+(ns co.poyo.watch-and-run.file-map
   (:require [me.raynes.fs :as fs]
             [clojure.java.io :as io]
             [clojure.edn :as edn]
