@@ -19,13 +19,7 @@
      ((resolve template) data))))
 
 (defn sym->ns-sym [sym]
-  (when-let [resolved (resolve sym)]
-    (-> resolved
-        meta
-        :ns
-        ns-name
-        name
-        symbol)))
+  (symbol (namespace sym)))
 
 (defn load-edn
   "Load edn from an io/reader source (filename or io/resource)."
@@ -49,15 +43,17 @@
          (fn file-map->jobs-br? [node] ;; branch
            (if-let [f (or (:build-fn node) (:template node))]
              (if-let [ns-sym (sym->ns-sym f)]
-               (do (vswap! acc conj
-                           {:base-path base-path
-                            :path (:path node)
-                            :template (:template node)
-                            :data (:data node)
-                            :ns-sym ns-sym
-                            :build-fn (or (:build-fn node)
-                                          (fn [] (spit-txt base-path node)))})
-                   false) ;; end tree walk here
+               (do
+                 (require ns-sym)
+                 (vswap! acc conj
+                         {:base-path base-path
+                          :path (:path node)
+                          :template (:template node)
+                          :data (:data node)
+                          :ns-sym ns-sym
+                          :build-fn (or (:build-fn node)
+                                        (fn [] (spit-txt base-path node)))})
+                 false) ;; end tree walk here
                (timbre/warnf "Could not find sym/ns [%s]" (:template node)))
              (map? node)))
          (fn file-map->jobs-children [node] ;; children
