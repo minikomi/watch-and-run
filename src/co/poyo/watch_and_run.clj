@@ -60,7 +60,8 @@
   (if-let [watched (:watched watch-and-run)]
     (do (swap! watched into jobs)
         (doseq [{:keys [build-fn]} jobs]
-          (build-fn)))
+          (build-fn))
+        jobs)
     (timbre/warn "Watcher not running.")))
 
 (defn remove-jobs [jobs]
