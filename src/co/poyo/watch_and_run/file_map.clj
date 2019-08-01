@@ -3,6 +3,7 @@
             [clojure.java.io :as io]
             [clojure.edn :as edn]
             [taoensso.timbre :as timbre]
+            [clojure.pprint :refer [pprint]]
             [clojure.string :as str]))
 
 (defn spit-txt [base-path {:keys [template path data]}]
@@ -10,8 +11,9 @@
         (apply fs/file
                base-path
                path)]
-    (timbre/infof "BUILD [%s]->[%s]"
+    (timbre/infof "BUILD [%s]->[%s/%s]"
                   template
+                  base-path
                   (str/join "/" path))
     (io/make-parents out-file)
     (spit
@@ -42,19 +44,20 @@
         (tree-seq
          (fn file-map->jobs-br? [node] ;; branch
            (if-let [f (or (:build-fn node) (:template node))]
-             (if-let [ns-sym (sym->ns-sym f)]
-               (do
-                 (require ns-sym)
-                 (vswap! acc conj
-                         {:base-path base-path
-                          :path (:path node)
-                          :template (:template node)
-                          :data (:data node)
-                          :ns-sym ns-sym
-                          :build-fn (or (:build-fn node)
-                                        (fn [] (spit-txt base-path node)))})
-                 false) ;; end tree walk here
-               (timbre/warnf "Could not find sym/ns [%s]" (:template node)))
+             (let [ns-sym (sym->ns-sym f)]
+               (require ns-sym)
+               (if (resolve f)
+                 (do
+                   (vswap! acc conj
+                           {:base-path base-path
+                            :path (:path node)
+                            :template (:template node)
+                            :data (:data node)
+                            :ns-sym ns-sym
+                            :build-fn (or (:build-fn node)
+                                          (fn [] (spit-txt base-path node)))})
+                   false) ;; end tree walk here
+                 (timbre/warnf "Could not find sym/ns [%s]" (:template node))))
              (map? node)))
          (fn file-map->jobs-children [node] ;; children
            (for [[p n] node
@@ -63,8 +66,7 @@
          file-map-edn))
        @acc)
      (catch Exception e
-
-       (timbre/errorf "Error loading file map %s [%s]" (.getMessage e) file-map-edn)))))
+       (timbre/errorf "Error loading file map %s \n%s" (.getMessage e) (with-out-str (pprint file-map-edn)))))))
 
 (defn load-file-map
   ([file-map-source]
