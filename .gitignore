@@ -9,3 +9,4 @@ node_modules/
 /out.json
 out/
 .cpcache
+watch-and-run.jar
