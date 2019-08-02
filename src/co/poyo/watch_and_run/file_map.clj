@@ -54,8 +54,11 @@
                             :template (:template node)
                             :data (:data node)
                             :ns-sym ns-sym
-                            :build-fn (or (:build-fn node)
-                                          (fn [] (spit-txt base-path node)))})
+                            :build-fn (if (:build-fn node)
+                                        (fn [] ((:build-fn node)
+                                                base-path
+                                                node))
+                                        (fn [] (spit-txt base-path node)))})
                    false) ;; end tree walk here
                  (timbre/warnf "Could not find sym/ns [%s]" (:template node))))
              (map? node)))
@@ -66,10 +69,17 @@
          file-map-edn))
        @acc)
      (catch Exception e
-       (timbre/errorf "Error loading file map %s \n%s" (.getMessage e) (with-out-str (pprint file-map-edn)))))))
+       (timbre/errorf "Error loading file map %s \n%s"
+                      (.getMessage e)
+                      (with-out-str
+                        (pprint file-map-edn)))))))
 
 (defn load-file-map
   ([file-map-source]
    (load-file-map file-map-source {:base-path "target"}))
   ([file-map-source opts]
    (parse-file-map (load-edn file-map-source) opts)))
+
+(defn run-all-jobs [jobs]
+  (doseq [{:keys [build-fn]} jobs]
+    (build-fn)))
