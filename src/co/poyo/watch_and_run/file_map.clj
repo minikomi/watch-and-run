@@ -81,5 +81,7 @@
    (parse-file-map (load-edn file-map-source) opts)))
 
 (defn run-all-jobs [jobs]
-  (doseq [{:keys [build-fn]} jobs]
-    (build-fn)))
+  (doall
+   (pmap (fn [{:keys [build-fn]}]
+           (build-fn))
+         jobs)))
