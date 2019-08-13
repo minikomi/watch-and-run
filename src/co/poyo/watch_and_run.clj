@@ -4,6 +4,7 @@
             [clojure.tools.namespace.file :as ns-file]
             [clojure.tools.namespace.find :as ns-find]
             [clojure.tools.namespace.track :as ns-track]
+            [clojure.tools.namespace.reload :as ns-reload]
             [hawk.core :as hawk]
             [mount.core :as mount]
             [co.poyo.watch-and-run.ns-tracker :refer [tracker]]
@@ -24,11 +25,11 @@
         all-dependencies (:dependencies (get-dep-graph tracked-src))
         ns-names (set (ns-find/find-namespaces (map io/file tracked-src)))
         part-of-project? (partial contains? ns-names)]
-     (tree-seq identity
-                   #(filter
-                     part-of-project?
-                     (get all-dependencies %))
-                   ns-sym)))
+    (tree-seq identity
+              #(filter
+                part-of-project?
+                (get all-dependencies %))
+              ns-sym)))
 
 (defn watch-handler [watched]
   (let [changed (set (tracker))
@@ -42,6 +43,7 @@
                      (contains? changed reload-ns-sym)
                      (not (contains? @reloaded reload-ns-sym)))]
         (timbre/info "Reloading:" reload-ns-sym)
+        (ns-reload/remove-lib ns-sym)
         (require reload-ns-sym :reload)
         (vswap! reloaded conj reload-ns-sym))
       (build-fn))))
@@ -51,7 +53,8 @@
   (let [watched (atom #{})
         watcher (hawk/watch!
                  [{:paths ["src"]
-                   :handler (fn [ctx ev] (watch-handler watched))}])]
+                   :handler (fn [ctx ev]
+                              (watch-handler watched))}])]
     {:watcher watcher :watched watched})
   :stop
   (hawk/stop! (:watcher watch-and-run)))
