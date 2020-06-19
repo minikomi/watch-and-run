@@ -3,7 +3,7 @@
            me.raynes/fs                {:mvn/version "1.4.6"}
            com.taoensso/timbre         {:mvn/version "4.10.0"}
            hawk                        {:mvn/version "0.2.11"}
-           org.clojure/tools.namespace {:mvn/version "0.3.0"}
+           org.clojure/tools.namespace {:mvn/version "1.0.0"}
            ns-tracker                  {:mvn/version "0.4.0"}}
  :aliases {:test {:extra-paths ["test"]
                   :extra-deps  {org.clojure/test.check {:mvn/version "RELEASE"}}}
