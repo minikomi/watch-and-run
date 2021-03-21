@@ -10,49 +10,56 @@
             [co.poyo.watch-and-run.ns-tracker :refer [tracker]]
             [taoensso.timbre :as timbre]))
 
+(defn read-files-from-src-path [src-path]
+  (ns-find/find-clojure-sources-in-dir
+   (io/file src-path)))
+
 (defn get-dep-graph [src-paths]
-  (let [src-files
-        (apply set/union
-               (map (comp #(ns-find/find-clojure-sources-in-dir %)
-                          io/file)
-                    src-paths))
-        tracker (ns-file/add-files {} src-files)
+  (let [src-files (map read-files-from-src-path src-paths)
+        src-files-unique (apply set/union src-files)
+        tracker (ns-file/add-files {} src-files-unique)
         dep-graph (tracker ::ns-track/deps)]
     dep-graph))
 
-(defn all-local-deps-deep [ns-sym]
-  (let [tracked-src ["src"]
-        all-dependencies (:dependencies (get-dep-graph tracked-src))
-        ns-names (set (ns-find/find-namespaces (map io/file tracked-src)))
-        part-of-project? (partial contains? ns-names)]
-    (tree-seq identity
-              #(filter
-                part-of-project?
-                (get all-dependencies %))
-              ns-sym)))
+(defn all-local-deps-deep
+  "Creates a sequence of local-only deps for a given namespace.
+   - The list starts with the given namespace.
+   - The list is unique
+   - The list is in 'dependent' order"
+  [tracked-src-paths ns-sym]
+  (let [all-dependencies (:dependencies (get-dep-graph tracked-src-paths))
+        ns-names (set (ns-find/find-namespaces (map io/file tracked-src-paths)))
+        seen (volatile! #{})
+        part-of-project? (partial contains? ns-names)
+        unseen? #(not (contains? @seen %))
+        branch (fn [ns-sym]
+                 (vswap! seen conj ns-sym))
+        children (fn [ns-sym]
+                   (->> ns-sym
+                        (get all-dependencies)
+                        (filter unseen?)
+                        (filter part-of-project?)))]
+    (tree-seq branch children ns-sym)))
 
 (defn watch-handler [watched]
-  (let [changed (set (tracker))
-        reloaded (volatile! #{})]
-    (doseq [{:keys [build-fn ns-sym]} @watched
+  (let [changed (set (tracker))]
+    (doseq [{:keys [post-reload-fn ns-sym]} @watched
             :let [deps (all-local-deps-deep ns-sym)
                   intersection (set/intersection (set deps) changed)]
             :when (not-empty intersection)]
       (doseq [reload-ns-sym (reverse deps)
-              :when (and
-                     (contains? changed reload-ns-sym)
-                     (not (contains? @reloaded reload-ns-sym)))]
+              :when (contains? changed reload-ns-sym)]
         (timbre/info "Reloading:" reload-ns-sym)
         (ns-reload/remove-lib ns-sym)
-        (require reload-ns-sym :reload)
-        (vswap! reloaded conj reload-ns-sym))
-      (build-fn))))
+        (require reload-ns-sym :reload))
+      (when post-reload-fn
+        (post-reload-fn)))))
 
 (mount/defstate watch-and-run
   :start
   (let [watched (atom #{})
         watcher (hawk/watch!
-                 [{:paths ["src"]
+                 [{:paths (:src-paths (mount/args))
                    :handler (fn [ctx ev]
                               (watch-handler watched))}])]
     {:watcher watcher :watched watched})
@@ -72,3 +79,7 @@
     (doseq [job jobs]
       (swap! watched disj job))
     (timbre/warn "Watcher not running.")))
+
+(comment
+
+  (mount/start))

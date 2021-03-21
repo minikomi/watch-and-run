@@ -20,7 +20,10 @@
      out-file
      ((resolve template) data))))
 
-(defn sym->ns-sym [sym]
+(defn sym->ns-sym
+  "extracts the namespace part from a symbol
+   of type namespace/symbol"
+  [sym]
   (symbol (namespace sym)))
 
 (defn load-edn
@@ -34,6 +37,23 @@
     (catch RuntimeException e
       (timbre/errorf "Error parsing edn file '%s': %s" source (.getMessage e)))))
 
+(defn -update-acc [acc f]
+  (let [ns-sym (sym->ns-sym f)]
+    (require ns-sym)
+    (if (resolve f)
+      (vswap! acc conj
+              {:base-path base-path
+               :path (:path node)
+               :template (:template node)
+               :data (:data node)
+               :ns-sym ns-sym
+               :build-fn (if (:build-fn node)
+                           (fn [] ((:build-fn node)
+                                   base-path
+                                   node))
+                           (fn [] (spit-txt base-path node)))})
+      (timbre/warnf "Could not find sym/ns [%s]" (:template node)))))
+
 (defn parse-file-map
   ([file-map-edn]
    (parse-file-map file-map-edn {:base-path ""}))
@@ -44,23 +64,8 @@
         (tree-seq
          (fn file-map->jobs-br? [node] ;; branch
            (if-let [f (or (:build-fn node) (:template node))]
-             (let [ns-sym (sym->ns-sym f)]
-               (require ns-sym)
-               (if (resolve f)
-                 (do
-                   (vswap! acc conj
-                           {:base-path base-path
-                            :path (:path node)
-                            :template (:template node)
-                            :data (:data node)
-                            :ns-sym ns-sym
-                            :build-fn (if (:build-fn node)
-                                        (fn [] ((:build-fn node)
-                                                base-path
-                                                node))
-                                        (fn [] (spit-txt base-path node)))})
-                   false) ;; end tree walk here
-                 (timbre/warnf "Could not find sym/ns [%s]" (:template node))))
+             (do (-update-acc acc f)
+                 false) ; end tree walk here
              (map? node)))
          (fn file-map->jobs-children [node] ;; children
            (for [[p n] node
