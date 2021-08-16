@@ -1,13 +1,15 @@
 {:paths   ["src"]
  :deps    {mount/mount                 {:mvn/version "0.1.16"}
            me.raynes/fs                {:mvn/version "1.4.6"}
-           com.taoensso/timbre         {:mvn/version "5.1.0"}
+           com.taoensso/timbre         {:mvn/version "5.1.2"}
            hawk/hawk                   {:mvn/version "0.2.11"}
            org.clojure/tools.namespace {:mvn/version "1.1.0"}
-           ns-tracker/ns-tracker       {:mvn/version "0.4.0"}}
- :aliases {:test {:extra-deps {lambdaisland/kaocha {:mvn/version "1.0.732"}}}
+           ns-tracker/ns-tracker       {:mvn/version "0.4.0"}
+           com.magnars/test-with-files {:mvn/version "2021-02-17"}
+           }
+ :aliases {:test {:extra-deps {lambdaisland/kaocha {:mvn/version "1.0.861"}}}
            :pack {:extra-deps {pack/pack.alpha {:git/url "https://github.com/juxt/pack.alpha.git"
-                                                :sha "0e8731e0f24db05b74769e219051b0e92b50624a"}}
+                                                :sha "b093f79420fef019faf62a75b888b5e10f4e8cc9"}}
                   :main-opts ["-m"]}
            :deploy {:extra-deps {deps-deploy/deps-deploy {:mvn/version "RELEASE"}}
                     :main-opts ["-m" "deps-deploy.deps-deploy" "deploy" "watch-and-run.jar"]}}}

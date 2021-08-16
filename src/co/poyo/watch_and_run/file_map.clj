@@ -26,6 +26,7 @@
   [sym]
   (symbol (namespace sym)))
 
+
 (defn load-edn
   "Load edn from an io/reader source (filename or io/resource)."
   [source]
@@ -37,7 +38,7 @@
     (catch RuntimeException e
       (timbre/errorf "Error parsing edn file '%s': %s" source (.getMessage e)))))
 
-(defn -update-acc [acc f]
+(defn -update-acc [base-path acc f]
   (let [ns-sym (sym->ns-sym f)]
     (require ns-sym)
     (if (resolve f)
@@ -52,7 +53,7 @@
                                    base-path
                                    node))
                            (fn [] (spit-txt base-path node)))})
-      (timbre/warnf "Could not find sym/ns [%s]" (:template node)))))
+      (timbre/warnf "Could not find sym/ns [%s]" (:node template)))))
 
 (defn parse-file-map
   ([file-map-edn]
@@ -64,7 +65,7 @@
         (tree-seq
          (fn file-map->jobs-br? [node] ;; branch
            (if-let [f (or (:build-fn node) (:template node))]
-             (do (-update-acc acc f)
+             (do (-update-acc base-path acc f)
                  false) ; end tree walk here
              (map? node)))
          (fn file-map->jobs-children [node] ;; children

@@ -45,8 +45,8 @@
   (let [changed (set (tracker))]
     (doseq [{:keys [post-reload-fn ns-sym]} @watched
             :let [deps (all-local-deps-deep ns-sym)
-                  intersection (set/intersection (set deps) changed)]
-            :when (not-empty intersection)]
+                  deps-did-change (set/intersection (set deps) changed)]
+            :when (not-empty deps-did-change)]
       (doseq [reload-ns-sym (reverse deps)
               :when (contains? changed reload-ns-sym)]
         (timbre/info "Reloading:" reload-ns-sym)
